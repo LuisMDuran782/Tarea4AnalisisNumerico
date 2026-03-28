@@ -1,0 +1,160 @@
+---
+title: "Tarea 4 – Interpolación polinomial y splines"
+author: "Luis Manuel Duran"
+format: html
+execute: 
+  echo: true
+  warning: false
+  message: false
+---
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.interpolate import lagrange, CubicSpline
+from scipy.stats import chi2
+import pandas as pd
+import yfinance as yf
+import plotly.graph_objects as go
+
+
+#EJERCICIO 1 – BASES DE LAGRANGE
+
+x=np.arange(6)
+y=np.array([1,3,-1,2,0,4])   # valores genéricos
+
+def L(k,xp):
+    prod=1
+    for j in range(len(x)):
+        if j!=k:
+            prod*= (xp-x[j])/(x[k]-x[j])
+    return prod
+
+xx=np.linspace(0,5,300)
+plt.figure()
+for k in range(len(x)):
+    plt.plot(xx,[L(k,t) for t in xx],label=f"L{k}")
+plt.legend(); plt.title("Bases de Lagrange"); plt.grid()
+
+P=lagrange(x,y)
+plt.figure()
+plt.scatter(x,y)
+plt.plot(xx,P(xx))
+plt.title("Polinomio interpolante")
+plt.grid()
+
+
+#EJERCICIO 2 – LAGRANGE VS SPLINES
+
+#a) f(x)=x cos x -3x
+f=lambda x:x*np.cos(x)-3*x
+df=lambda x:np.cos(x)-x*np.sin(x)-3
+
+xp=np.array([0,0.5,1,1.5])
+yp=f(xp)
+P=lagrange(xp,yp)
+cs_nat=CubicSpline(xp,yp,bc_type='natural')
+cs_cond=CubicSpline(xp,yp,bc_type=((1,df(0)),(1,df(1.5))))
+
+x0=0.8
+print("Lagrange:",P(x0),P.deriv()(x0))
+print("Spline nat:",cs_nat(x0),cs_nat(x0,1))
+print("Spline cond:",cs_cond(x0),cs_cond(x0,1))
+
+#b) f(x)=log(e^x+2)
+f=lambda x:np.log(np.exp(x)+2)
+df=lambda x:np.exp(x)/(np.exp(x)+2)
+
+xp=np.array([-2,-1,0,1,2])
+yp=f(xp)
+P=lagrange(xp,yp)
+cs=CubicSpline(xp,yp,bc_type='natural')
+
+print(P(0.5),cs(0.5))
+
+#c) f(x)=e^x+e^{-x}
+f=lambda x:np.exp(x)+np.exp(-x)
+df=lambda x:np.exp(x)-np.exp(-x)
+
+xp=np.array([0,0.5,1,1.5,2])
+yp=f(xp)
+P=lagrange(xp,yp)
+cs=CubicSpline(xp,yp)
+
+print(P(0.75),cs(0.75))
+
+
+#EJERCICIO 3 – DENSIDAD DEL AGUA
+
+T=np.array([50,60,65,75,80])
+rho=np.array([988,985.7,980.5,974.8,971.6])
+
+P=lagrange(T,rho)
+cs=CubicSpline(T,rho)
+
+print("63°C Lagrange:",P(63))
+print("63°C spline:",cs(63))
+
+
+#EJERCICIO 4 – SPLINE MANUAL
+
+np.random.seed(123)
+x=np.arange(0,11)
+y=np.random.choice(np.arange(-25,26),len(x))
+cs=CubicSpline(x,y)
+
+
+#EJERCICIO 5 – SPLINES CONDICIONADOS (PLOTLY)
+
+def spline_plot(f,a,b,n):
+    x=np.linspace(a,b,n+1)
+    y=f(x)
+    cs=CubicSpline(x,y)
+    xx=np.linspace(a,b,400)
+    fig=go.Figure()
+    fig.add_scatter(x=xx,y=f(xx),name="Real")
+    fig.add_scatter(x=xx,y=cs(xx),name="Spline")
+    fig 
+
+spline_plot(lambda x:np.exp(-x)*np.sin(np.pi*x),0,2,19)
+
+
+#EJERCICIO 6 – SPLINES CHI-CUADRADA
+
+k=10
+f=lambda x:chi2.pdf(x,k)
+
+def spline_chi(n):
+    x=np.linspace(0,30,n+1)
+    cs=CubicSpline(x,f(x))
+    xx=np.linspace(0,30,500)
+    fig=go.Figure()
+    fig.add_scatter(x=xx,y=f(xx),name="Real")
+    fig.add_scatter(x=xx,y=cs(xx),name=f"Spline n={n}")
+    display(fig)
+
+for n in [5,7,10,15,20]:
+    spline_chi(n)
+
+#EJERCICIO 7 – INDICADORES INEGI (EJEMPLO)
+
+# Ejemplo simulando datos mensuales
+fechas=pd.date_range("2022-01-01","2023-12-01",freq="ME")
+indicador1=np.sin(np.linspace(0,6,len(fechas)))+10
+indicador2=np.cos(np.linspace(0,6,len(fechas)))+20
+
+cs1=CubicSpline(range(len(indicador1)),indicador1)
+cs2=CubicSpline(range(len(indicador2)),indicador2)
+
+
+
+
+#EJERCICIO 8 – ACCIONES YFINANCE
+
+acciones=yf.download(["AAPL","MSFT"],period="2y",interval="1mo")["Close"]
+acciones=acciones.dropna()
+
+x=np.arange(len(acciones))
+csA=CubicSpline(x,acciones["AAPL"])
+cs
+M=CubicSpline(x,acciones["MSFT"])
